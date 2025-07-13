@@ -40,6 +40,7 @@ def xgboost_params():
         "gamma": 0,
         "reg_alpha": 0,
         "reg_lambda": 1,
+        "target_name": "target",
     }
 
 

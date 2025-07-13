@@ -174,7 +174,7 @@ class TabNetWrapper(ModelWrapper):
         write_json(self.dump(), os.path.join("/tmp", self.file_to_add))
         with zipfile.ZipFile(fpath, "a") as zipf:
             zipf.write(os.path.join("/tmp", self.file_to_add), arcname=self.file_to_add)
-        
+
         return fpath
 
     def feature_names(self) -> Sequence[str]:

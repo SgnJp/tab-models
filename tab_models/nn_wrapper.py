@@ -148,7 +148,11 @@ class TabularDataset(Dataset):
         self.X = torch.tensor(X.values, dtype=torch.float16)
         del X
         gc.collect()
-        self.y = torch.tensor(y.values, dtype=torch.float16) if y is not None else None
+        self.y = (
+            torch.tensor(y.values, dtype=torch.float16).squeeze(1)
+            if y is not None
+            else None
+        )
         del y
         gc.collect()
 
@@ -156,7 +160,9 @@ class TabularDataset(Dataset):
         return len(self.X)
 
     def __getitem__(self, idx):
-        return self.X[idx].float(), (self.y[idx].float() if self.y is not None else 0.0)
+        return self.X[idx].float(), (
+            self.y[idx].float().squeeze() if self.y is not None else 0.0
+        )
 
 
 def get_model_outputs(model, data_loader, device):
@@ -197,7 +203,7 @@ class NNWrapper(ModelWrapper):
             input_dim=len(self.features),
             hidden_dims=self.params["hidden_dims"],
             dropout_rates=self.params["dropout_rates"],
-            input_noise_std=self.params["input_noise_std"],
+            input_noise_std=self.params["input_noise"],
             input_dropout=self.params.get("input_dropout", 0),
             output_dim=len(self.params["auxiliary_targets"]) + 1,
         )
@@ -222,14 +228,17 @@ class NNWrapper(ModelWrapper):
             input_dim=len(self.features),
             hidden_dims=self.params["hidden_dims"],
             dropout_rates=self.params["dropout_rates"],
-            input_noise_std=self.params["input_noise"],
+            input_noise_std=self.params.get("input_noise", 0),
             output_dim=len(self.params["auxiliary_targets"]) + 1,
         )
         self.model.load_state_dict(model_dump["model_state_dict"])
         self.mode.to(device)
 
     def _prepare_data(self, data, fit_scaler):
-        X, y = data[self.features], data[["target"] + self.params["auxiliary_targets"]]
+        X, y = (
+            data[self.features],
+            data[[self.params["target_name"]] + self.params["auxiliary_targets"]],
+        )
         del data
 
         if fit_scaler:
@@ -282,20 +291,20 @@ class NNWrapper(ModelWrapper):
             optimizer, T_0=4 * self.params["num_epochs"], T_mult=1
         )
 
-        loss_fn = get_loss(self.params["loss"]["name"])
-        main_target_loss_factor = self.params["loss"]["main_target_init_factor"]
+        loss_fn = get_loss(self.params["loss_fn"])
         val_per_era_corr = None
         val_sharpe = None
         best_sharpe = 0.0
 
         steps_without_improvement = 0
+        main_target_loss_factor = 1.0
 
         for epoch in range(self.params["num_epochs"]):
             self.model.train()
             running_loss = 0.0
             NUM_TOTAL = len(train_loader) // 4
 
-            use_mixup = self.params["mixup_alpha"] > 0.0
+            use_mixup = self.params.get("mixup_alpha", 0.0) > 0.0
 
             for data_loader_idx, (inputs, targets) in enumerate(train_loader):
                 inputs, targets = inputs.to(device, non_blocking=True), targets.to(
@@ -329,49 +338,28 @@ class NNWrapper(ModelWrapper):
                         self.model.eval()
                         val_output = get_model_outputs(self.model, val_loader, "cuda")
 
-                        main_target_loss_factor = min(
-                            main_target_loss_factor
-                            * self.params["loss"]["main_target_factor_increment"],
-                            self.params["loss"]["main_target_max_factor"],
-                        )
-
                         # Use eval_metrics if provided
                         val_metrics = None
-                        if eval_metrics is not None:
-                            y_true = val_data["target"]
-                            y_pred = val_output[:, 0]
-                            if isinstance(eval_metrics, list):
-                                val_metrics = {}
-                                for metric_fn in eval_metrics:
-                                    val_metrics.update(metric_fn(y_true, y_pred))
-                            else:
-                                val_metrics = eval_metrics(y_true, y_pred)
-                        else:
-                            val_metrics = {}
+                        y_true = val_data[self.params["target_name"]]
+                        y_pred = val_output
 
-                        val_per_era_corr = val_metrics.get("per_era_corr")
-                        val_sharpe = val_metrics.get("sharpe", 0.0)
-
-                        if val_sharpe > best_sharpe:
-                            best_sharpe = val_sharpe
-                            steps_without_improvement = 0
-                        else:
-                            steps_without_improvement += 1
+                        val_metrics = {}
+                        for metric_fn in eval_metrics:
+                            name, score, _ = metric_fn(y_pred, y_true)
+                            val_metrics[name] = score
 
                         scheduler.step()
 
                     print(
-                        f"Epoch {epoch+1}/{self.params['num_epochs']}, Train Loss: {running_loss/len(train_ds):.7f}, Loss factor: {main_target_loss_factor}, LR = {optimizer.param_groups[0]['lr']:.5f}"
-                        + (
-                            f", Val per era corr: {100*val_per_era_corr:.7f}, Val sharpe: {val_sharpe:.7f}"
+                        f"Epoch {epoch+1}/{self.params['num_epochs']}, Train Loss: {running_loss/len(train_ds):.7f}, LR = {optimizer.param_groups[0]['lr']:.5f}, Val metrics: {{'"
+                        + ", ".join(
+                            [f"{k}: {float(v):.4f}" for k, v in val_metrics.items()]
                         )
-                        if val_per_era_corr is not None
-                        else ""
+                        + "'}}"
                     )
 
                     running_loss = 0.0
                     self.model.train()
-
 
         return val_data
 
