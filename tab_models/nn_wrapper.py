@@ -353,7 +353,6 @@ class NNWrapper(ModelWrapper):
                         val_sharpe = val_metrics.get("sharpe", 0.0)
 
                         if val_sharpe > best_sharpe:
-                            self.save(f"checkpoints/{self.model_name}_best.pth")
                             best_sharpe = val_sharpe
                             steps_without_improvement = 0
                         else:
@@ -370,14 +369,9 @@ class NNWrapper(ModelWrapper):
                         else ""
                     )
 
-                    if steps_without_improvement > 40:
-                        print("Early stopping")
-                        break
-
                     running_loss = 0.0
                     self.model.train()
 
-            self.save(f"checkpoints/{self.model_name}_iter{epoch}.pth")
 
         return val_data
 
