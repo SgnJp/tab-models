@@ -6,8 +6,9 @@ import pandas as pd
 import numpy as np
 from lightgbm.callback import CallbackEnv
 import lightgbm as lgb
+import torch
 
-from model_wrapper import ModelWrapper
+from model_wrapper import ModelWrapper, ModelCallback
 
 
 class LGBMCallbackWrapper:
@@ -46,7 +47,8 @@ class LGBMWrapper(ModelWrapper):
 
         if self.params is not None:
             self.params["num_leaves"] = 2 ** self.params["max_depth"] - 1
-            self.params["device"] = "gpu"
+            if torch.cuda.is_available():
+                self.params["device"] = "gpu"
             self.params["verbosity"] = -1
             self.target_name = self.params["target_name"]
 
@@ -55,7 +57,7 @@ class LGBMWrapper(ModelWrapper):
         train_data: pd.DataFrame,
         val_data: pd.DataFrame,
         eval_metrics: Optional[Callable] = None,
-        callbacks: Optional[List[ModelWrapper]] = None,
+        callbacks: Optional[List[ModelCallback]] = None,
     ) -> None:
         if callbacks is None:
             callbacks = []

@@ -1,10 +1,8 @@
-import pytest
 import pandas as pd
 import numpy as np
 import tempfile
 import os
 import sys
-import shutil
 
 # Add the tab-models directory to the path so we can import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tab_models"))
