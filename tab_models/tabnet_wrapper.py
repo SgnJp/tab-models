@@ -117,22 +117,6 @@ class TabNetWrapper(ModelWrapper):
         X = self.scaler_imputer.transform(X)
         return X, y
 
-    def _split_train_val(
-        self, data: pd.DataFrame
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        data["era"] = data["era"].astype(int)
-
-        val_era_start = data.era.max() - self.params["num_val_eras"]
-        train_era_end = val_era_start - 4
-
-        print(f"Training on data before: {train_era_end}")
-        train_data = data[data.era < train_era_end]
-        print(f"Validating on data starting with: {val_era_start}")
-        val_data = data[data.era >= val_era_start]
-
-        val_meta = val_data[[self.params["target_name"], "era"]].copy()
-        return train_data, val_data, val_meta
-
     def fit(
         self,
         train_data: pd.DataFrame,
