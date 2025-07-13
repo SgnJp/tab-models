@@ -20,9 +20,11 @@ from pytorch_tabnet.metrics import Metric
 
 from utils import log_timing, write_json
 from model_wrapper import ModelWrapper
-from torch_losses import get_loss
+from nn_utils import get_loss
 
 from typing import Any, Callable, Sequence, Optional, Tuple, Dict, List, Union
+
+from nn_utils import ScalerImputer
 
 
 def get_noise_augmentation_func(noise_std: float) -> Callable:
@@ -51,8 +53,7 @@ class TabNetWrapper(ModelWrapper):
     file_to_add: str = "tabnet_wrapper_params.json"
     features: Sequence[str]
     params: Dict[str, Any]
-    scaler: StandardScaler
-    imputer: SimpleImputer
+    scaler_imputer: ScalerImputer
     preprocess_fit: bool
     model: Any
     model_name: str
@@ -67,8 +68,7 @@ class TabNetWrapper(ModelWrapper):
         if fpath is None:
             self.features = features
             self.params = params
-            self.scaler = StandardScaler()
-            self.imputer = SimpleImputer(strategy="mean")
+            self.scaler_imputer = ScalerImputer()
             self.preprocess_fit = False
         else:
             with zipfile.ZipFile(fpath, "r") as zipf:
@@ -77,12 +77,7 @@ class TabNetWrapper(ModelWrapper):
 
             self.features = data["features"]
             self.params = data["params"]
-            scaler_bytes = base64.b64decode(data["scaler"])
-            self.scaler = pickle.loads(scaler_bytes)
-
-            imputer_bytes = base64.b64decode(data["imputer"])
-            self.imputer = pickle.loads(imputer_bytes)
-
+            self.scaler_imputer = ScalerImputer.load(data["scaler"], data["imputer"])
             self.preprocess_fit = True
 
         self.model = TabNetRegressor(
@@ -116,16 +111,10 @@ class TabNetWrapper(ModelWrapper):
         )
 
         if fit_preprocess:
-            self.scaler.fit(X[::10])
-            self.imputer.fit(X[::10])
+            self.scaler_imputer.fit(X[::10])
             self.preprocess_fit = True
 
-        X = X.astype(np.float32, copy=False)
-        batch_size = 50000
-        for i in range(0, len(X), batch_size):
-            X[i : i + batch_size] = self.imputer.transform(X[i : i + batch_size])
-            X[i : i + batch_size] = self.scaler.transform(X[i : i + batch_size])
-
+        X = self.scaler_imputer.transform(X)
         return X, y
 
     def _split_train_val(
@@ -178,19 +167,11 @@ class TabNetWrapper(ModelWrapper):
     @log_timing()
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:
         test_data = test_data[self.features]
-        test_data = test_data.astype(np.float32, copy=False)
-        test_data[:] = self.imputer.transform(test_data)
-        test_data[:] = self.scaler.transform(test_data)
-
+        test_data = self.scaler_imputer.transform(test_data)
         return self.model.predict(test_data.values)[:, 0]
 
     def dump(self) -> Dict[str, Any]:
-        scaler_bytes = pickle.dumps(self.scaler)
-        scaler_b64 = base64.b64encode(scaler_bytes).decode("utf-8")
-
-        imputer_bytes = pickle.dumps(self.imputer)
-        imputer_b64 = base64.b64encode(imputer_bytes).decode("utf-8")
-
+        scaler_b64, imputer_b64 = self.scaler_imputer.dump()
         return {
             "scaler": scaler_b64,
             "imputer": imputer_b64,
