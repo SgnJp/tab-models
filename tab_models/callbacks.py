@@ -1,6 +1,6 @@
 import os
 
-from .model_wrapper import ModelCallback, ModelWrapper
+from tab_models.model_wrapper import ModelCallback, ModelWrapper
 import logging
 
 

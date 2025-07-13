@@ -1,4 +1,4 @@
-from .model_wrapper import ModelWrapper
+from tab_models.model_wrapper import ModelWrapper
 
 
 def load_model(fpath) -> ModelWrapper:

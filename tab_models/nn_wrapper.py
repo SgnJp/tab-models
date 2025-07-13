@@ -12,11 +12,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
-from utils import log_timing
-from model_wrapper import ModelCallback, ModelWrapper
+from tab_models.model_wrapper import ModelCallback, ModelWrapper
+from tab_models.nn_utils import ScalerImputer, get_loss
 
 import pandas as pd
-from nn_utils import ScalerImputer, get_loss
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -18,13 +18,11 @@ from pytorch_tabnet.tab_model import TabNetRegressor
 from pytorch_tabnet.metrics import Metric
 
 
-from utils import log_timing, write_json
-from model_wrapper import ModelWrapper
-from nn_utils import get_loss
+from tab_models.utils import log_timing, write_json
+from tab_models.model_wrapper import ModelWrapper
+from tab_models.nn_utils import get_loss, ScalerImputer
 
 from typing import Any, Callable, Sequence, Optional, Tuple, Dict, List, Union
-
-from nn_utils import ScalerImputer
 
 
 def get_noise_augmentation_func(noise_std: float) -> Callable:
@@ -43,7 +41,6 @@ def get_metric_wrapper(metric_function: Callable) -> Callable[[], "Metric"]:
             self._name, _, self._maximize = metric_function(None, None)
 
         def __call__(self, y_true: Any, y_pred: Any) -> Any:
-            print("val", len(y_true), len(y_pred))
             return metric_function(y_pred, y_true)[1]
 
     return MetricWrapper
@@ -163,13 +160,22 @@ class TabNetWrapper(ModelWrapper):
             "features": self.features,
         }
 
-    def save(self, fpath: str) -> None:
+    def save(self, fpath: str) -> str:
+
+        if os.path.isdir(fpath):
+            fpath = os.path.join(fpath, f"{self.model_name}.bin")
+
+        if os.path.exists(fpath):
+            os.remove(fpath)
+
         self.model.save_model(fpath)
         os.rename(f"{fpath}.zip", fpath)
 
         write_json(self.dump(), os.path.join("/tmp", self.file_to_add))
         with zipfile.ZipFile(fpath, "a") as zipf:
             zipf.write(os.path.join("/tmp", self.file_to_add), arcname=self.file_to_add)
+        
+        return fpath
 
     def feature_names(self) -> Sequence[str]:
         return self.features

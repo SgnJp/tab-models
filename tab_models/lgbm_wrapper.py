@@ -1,3 +1,4 @@
+import os
 import joblib
 import gc
 from typing import Any, Callable, List, Optional, Sequence, Union
@@ -8,7 +9,7 @@ from lightgbm.callback import CallbackEnv
 import lightgbm as lgb
 import torch
 
-from model_wrapper import ModelWrapper, ModelCallback
+from tab_models.model_wrapper import ModelWrapper, ModelCallback
 
 
 class LGBMCallbackWrapper:
@@ -86,10 +87,15 @@ class LGBMWrapper(ModelWrapper):
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:
         return self.model.predict(test_data[self.features])
 
-    def save(self, fpath: str):
+    def save(self, fpath: str) -> str:
         assert self.model is not None
         self.model.target_name = self.params["target_name"]
-        joblib.dump(self.model, fpath)
+        if os.path.isdir(fpath):
+            joblib.dump(self.model, os.path.join(fpath, f"{self.model_name}.bin"))
+            return os.path.join(fpath, f"{self.model_name}.bin")
+        else:
+            joblib.dump(self.model, fpath)
+            return fpath
 
     def feature_names(self) -> Sequence[str]:
         return self.features
