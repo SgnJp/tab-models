@@ -64,7 +64,7 @@ Documentation = "https://github.com/yourusername/tab-models#readme"
 "Source Code" = "https://github.com/yourusername/tab-models"
 
 [tool.setuptools.packages.find]
-include = ["tab-models*"]
+include = ["tab_models*"]
 
 [tool.black]
 line-length = 88
