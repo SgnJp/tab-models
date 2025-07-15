@@ -7,9 +7,17 @@ import pandas as pd
 import numpy as np
 from lightgbm.callback import CallbackEnv
 import lightgbm as lgb
-import torch
 
 from tab_models.model_wrapper import ModelWrapper, ModelCallback
+
+
+def is_cuda_available():
+    try:
+        import torch
+
+        return torch.cuda.is_available()
+    except:
+        return False
 
 
 class LGBMCallbackWrapper:
@@ -48,7 +56,7 @@ class LGBMWrapper(ModelWrapper):
 
         if self.params is not None:
             self.params["num_leaves"] = 2 ** self.params["max_depth"] - 1
-            if torch.cuda.is_available():
+            if is_cuda_available():
                 self.params["device"] = "gpu"
             self.params["verbosity"] = -1
             self.target_name = self.params["target_name"]
