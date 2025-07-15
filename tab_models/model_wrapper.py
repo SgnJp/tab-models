@@ -19,7 +19,7 @@ class ModelWrapper(ABC):
     def fit(
         self,
         train_data: pd.DataFrame,
-        val_data: pd.DataFrame,
+        val_data: Optional[pd.DataFrame] = None,
         eval_metrics: Optional[Callable] = None,
         callbacks: Optional[List[ModelCallback]] = None,
     ) -> None:

@@ -35,7 +35,7 @@ class TestNNWrapper:
         self.params = {
             "hidden_dims": [8, 8],
             "dropout_rates": [0.1, 0.1],
-            "input_noise_std": 0.0,
+            "input_noise": 0.0,
             "input_dropout": 0.0,
             "learning_rate": 0.01,
             "weight_decay": 0.0,

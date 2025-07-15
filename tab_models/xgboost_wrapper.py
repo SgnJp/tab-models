@@ -4,6 +4,9 @@ from tab_models.model_wrapper import ModelWrapper
 from tab_models.utils import log_timing
 import os
 import time
+from typing import Callable, Optional, Sequence
+import pandas as pd
+import numpy as np
 
 
 class CheckpointCallback(TrainingCallback):
@@ -64,7 +67,7 @@ class XGBoostWrapper(ModelWrapper):
                 learning_rate=params["learning_rate"],
                 max_depth=params["max_depth"],
                 device="cuda:0",
-                seed=params["seed"],
+                seed=params.get("seed", 0),
                 subsample=params["subsample"],
                 min_child_weight=params["min_child_weight"],
                 callbacks=[TimeCallback(), CheckpointCallback(1000, model_name)],
@@ -72,7 +75,13 @@ class XGBoostWrapper(ModelWrapper):
             self.features = features
             self.params = params
 
-    def fit(self, train_data, val_data, eval_metrics=None, callbacks=None):
+    def fit(
+        self,
+        train_data: pd.DataFrame,
+        val_data: Optional[pd.DataFrame] = None,
+        eval_metrics: Optional[Callable] = None,
+        callbacks: Optional[list] = None,
+    ) -> None:
         if self.fpath is not None:
             self.model.fit(
                 train_data[self.features],
@@ -84,11 +93,13 @@ class XGBoostWrapper(ModelWrapper):
                 train_data[self.features], train_data[self.params["target_name"]]
             )
 
-    @log_timing()
-    def predict(self, test_data):
-        return self.model.predict(test_data[self.features])
+    def predict(self, test_data: pd.DataFrame) -> np.ndarray:
+        import numpy as np
 
-    def save(self, fpath):
+        result = self.model.predict(test_data[self.features])
+        return np.asarray(result)
+
+    def save(self, fpath: str) -> None:
         import pickle
         import os
 
@@ -108,10 +119,10 @@ class XGBoostWrapper(ModelWrapper):
         with open(save_path, "wb") as f:
             pickle.dump(extra_info, f)
 
-        return save_path
+        # No return, as per abstract method
 
-    def feature_names(self):
+    def feature_names(self) -> Sequence[str]:
         return self.features
 
-    def target_names(self):
+    def target_names(self) -> Sequence[str]:
         return [self.params["target_name"]]

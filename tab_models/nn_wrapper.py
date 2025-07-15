@@ -291,7 +291,7 @@ class NNWrapper(ModelWrapper):
             optimizer, T_0=4 * self.params["num_epochs"], T_mult=1
         )
 
-        loss_fn = get_loss(self.params["loss_fn"])
+        loss_fn = get_loss(self.params.get("loss_fn", "mse"))
         val_per_era_corr = None
         val_sharpe = None
         best_sharpe = 0.0
@@ -334,16 +334,14 @@ class NNWrapper(ModelWrapper):
                 running_loss += loss.item() * inputs.size(0)
 
                 if (data_loader_idx + 1) % NUM_TOTAL == 0:
+                    val_metrics = {}
                     if len(val_ds) != 0:
                         self.model.eval()
                         val_output = get_model_outputs(self.model, val_loader, "cuda")
 
-                        # Use eval_metrics if provided
-                        val_metrics = None
                         y_true = val_data[self.params["target_name"]]
                         y_pred = val_output
 
-                        val_metrics = {}
                         for metric_fn in eval_metrics:
                             name, score, _ = metric_fn(y_pred, y_true)
                             val_metrics[name] = score
