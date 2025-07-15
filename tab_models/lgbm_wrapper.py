@@ -67,8 +67,10 @@ class LGBMWrapper(ModelWrapper):
             train_data[self.params["target_name"]],
             free_raw_data=True,
         )
-        valid_set = lgb.Dataset(
-            val_data[self.features], val_data[self.params["target_name"]]
+        valid_sets = (
+            [lgb.Dataset(val_data[self.features], val_data[self.params["target_name"]])]
+            if len(val_data) > 0
+            else []
         )
 
         del train_data
@@ -77,7 +79,7 @@ class LGBMWrapper(ModelWrapper):
         self.model = lgb.train(
             self.params,
             train_set,
-            valid_sets=[valid_set],
+            valid_sets=valid_sets,
             valid_names=["valid"],
             feval=eval_metrics,
             init_model=self.model,

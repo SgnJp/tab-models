@@ -18,6 +18,10 @@ def load_model(fpath) -> ModelWrapper:
         from .tabnet_wrapper import TabNetWrapper
 
         return TabNetWrapper(None, None, fpath)
+    elif "catboost" in fpath or "cat" in fpath:
+        from .catboost_wrapper import CatBoostWrapper
+
+        return CatBoostWrapper(None, None, fpath)
     else:
         raise RuntimeError(f"Not supported model type: {fpath}")
 
@@ -38,8 +42,11 @@ def get_model(params, features, fpath=None, model_name="") -> ModelWrapper:
     elif params["model"] == "tabnet":
         from .tabnet_wrapper import TabNetWrapper
 
-        model = TabNetWrapper(params, features, fpath, f"tabnet_{model_name}")
-        print("mid", id(model))
-        return model
+        return TabNetWrapper(params, features, fpath, f"tabnet_{model_name}")
+
+    elif params["model"] == "catboost":
+        from .catboost_wrapper import CatBoostWrapper
+
+        return CatBoostWrapper(params, features, fpath, f"catboost_{model_name}")
 
     raise RuntimeError(f"Not known model: {params['model']}")

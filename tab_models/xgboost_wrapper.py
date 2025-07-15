@@ -60,29 +60,29 @@ class XGBoostWrapper(ModelWrapper):
             self.model = XGBRegressor(
                 objective=params["objective"],
                 n_estimators=params["n_estimators"],
-                colsample_bynode=params["colsample_bynode"],
+                colsample_bytree=params["colsample_bytree"],
                 learning_rate=params["learning_rate"],
                 max_depth=params["max_depth"],
                 device="cuda:0",
+                seed=params["seed"],
                 subsample=params["subsample"],
                 min_child_weight=params["min_child_weight"],
-                gamma=params["gamma"],
-                reg_alpha=params["reg_alpha"],
-                reg_lambda=params["reg_lambda"],
                 callbacks=[TimeCallback(), CheckpointCallback(1000, model_name)],
             )
             self.features = features
             self.params = params
 
-    def fit(self, train_data):
+    def fit(self, train_data, val_data, eval_metrics=None, callbacks=None):
         if self.fpath is not None:
             self.model.fit(
                 train_data[self.features],
-                train_data["target"],
+                train_data[self.params["target_name"]],
                 xgb_model=os.path.join("checkpoints", self.fpath),
             )
         else:
-            self.model.fit(train_data[self.features], train_data["target"])
+            self.model.fit(
+                train_data[self.features], train_data[self.params["target_name"]]
+            )
 
     @log_timing()
     def predict(self, test_data):
@@ -90,6 +90,14 @@ class XGBoostWrapper(ModelWrapper):
 
     def save(self, fpath):
         import pickle
+        import os
+
+        # Check if fpath is a directory
+        if os.path.isdir(fpath):
+            filename = f"{self.model_name}.pkl"
+            save_path = os.path.join(fpath, filename)
+        else:
+            save_path = fpath
 
         extra_info = {
             "model": self.model,
@@ -97,8 +105,10 @@ class XGBoostWrapper(ModelWrapper):
             "target_name": self.target_names()[0],
             "params": self.params,
         }
-        with open(fpath, "wb") as f:
+        with open(save_path, "wb") as f:
             pickle.dump(extra_info, f)
+
+        return save_path
 
     def feature_names(self):
         return self.features
