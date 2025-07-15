@@ -54,11 +54,6 @@ class XGBoostWrapper(ModelWrapper):
             self.model = info["model"]
             self.features = info["feature_names"]
             self.params = info["params"]
-        elif self.fpath is not None:
-            self.model = XGBRegressor()
-            self.model.load_model(fpath)
-            self.features = self.model.feature_names_in_.tolist()
-            self.params = params
         else:
             self.model = XGBRegressor(
                 objective=params["objective"],
@@ -82,16 +77,9 @@ class XGBoostWrapper(ModelWrapper):
         eval_metrics: Optional[Callable] = None,
         callbacks: Optional[list] = None,
     ) -> None:
-        if self.fpath is not None:
-            self.model.fit(
-                train_data[self.features],
-                train_data[self.params["target_name"]],
-                xgb_model=os.path.join("checkpoints", self.fpath),
-            )
-        else:
-            self.model.fit(
-                train_data[self.features], train_data[self.params["target_name"]]
-            )
+        self.model.fit(
+            train_data[self.features], train_data[self.params["target_name"]]
+        )
 
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:
         import numpy as np
