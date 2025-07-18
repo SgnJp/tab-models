@@ -4,6 +4,7 @@ from tab_models.model_wrapper import ModelCallback, ModelWrapper
 import logging
 import time
 
+
 class CheckpointCallback(ModelCallback):
     def __init__(self, path_to_checkpoints, n_iterations, base_name=""):
         self.path_to_checkpoints = path_to_checkpoints
@@ -29,4 +30,4 @@ class TimeCallback(ModelCallback):
 
     def after_iteration(self, iter_num: int, model: ModelWrapper):
         if iter_num % self.n_iterations == 0 and iter_num != 0:
-            print (f"Iteration {iter_num} done after {time.time() - self.start} sec")
+            print(f"Iteration {iter_num} done after {time.time() - self.start} sec")
