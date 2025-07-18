@@ -70,6 +70,7 @@ class LGBMWrapper(ModelWrapper):
     ) -> None:
         if callbacks is None:
             callbacks = []
+
         train_set = lgb.Dataset(
             train_data[self.features],
             train_data[self.params["target_name"]],
@@ -91,7 +92,8 @@ class LGBMWrapper(ModelWrapper):
             valid_names=["valid"],
             feval=eval_metrics,
             init_model=self.model,
-            callbacks=[LGBMCallbackWrapper(cb, self) for cb in callbacks],
+            callbacks=[LGBMCallbackWrapper(cb, self) for cb in callbacks]
+            + [lgb.log_evaluation(100)],
         )
 
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:

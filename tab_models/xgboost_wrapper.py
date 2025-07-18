@@ -55,18 +55,6 @@ class XGBoostWrapper(ModelWrapper):
             self.features = info["feature_names"]
             self.params = info["params"]
         else:
-            self.model = XGBRegressor(
-                objective=params["objective"],
-                n_estimators=params["n_estimators"],
-                colsample_bytree=params["colsample_bytree"],
-                learning_rate=params["learning_rate"],
-                max_depth=params["max_depth"],
-                device="cuda:0",
-                seed=params.get("seed", 0),
-                subsample=params["subsample"],
-                min_child_weight=params["min_child_weight"],
-                callbacks=[TimeCallback(), CheckpointCallback(1000, model_name)],
-            )
             self.features = features
             self.params = params
 
@@ -77,8 +65,36 @@ class XGBoostWrapper(ModelWrapper):
         eval_metrics: Optional[Callable] = None,
         callbacks: Optional[list] = None,
     ) -> None:
+        def custom_eval(dtrain, predt):
+            name, score, _ = eval_metrics(predt, dtrain)
+            return score
+
+        self.model = XGBRegressor(
+            objective=self.params["objective"],
+            n_estimators=self.params["n_estimators"],
+            colsample_bytree=self.params["colsample_bytree"],
+            learning_rate=self.params["learning_rate"],
+            max_depth=self.params["max_depth"],
+            device="cuda:0",
+            seed=self.params.get("seed", 0),
+            subsample=self.params["subsample"],
+            min_child_weight=self.params["min_child_weight"],
+            eval_metric=custom_eval if eval_metrics is not None else None,
+            #            tree_method="hist",
+            #            multi_strategy="multi_output_tree",
+            callbacks=[TimeCallback()],
+        )
+
+        all_target_names = [self.params["target_name"]] + self.params.get("auxiliary_targets", [])
         self.model.fit(
-            train_data[self.features], train_data[self.params["target_name"]]
+            train_data[self.features],
+            train_data[all_target_names],
+            eval_set=(
+                [(val_data[self.features], val_data[all_target_names])]
+                if val_data is not None
+                else None
+            ),
+            verbose=100,
         )
 
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:
