@@ -34,6 +34,23 @@ class LGBMCallbackWrapper:
         self.model_callback.after_iteration(env.iteration, self.model_wrapper)
 
 
+class LgbmMetric:
+    def __init__(self, metric_fn, eval_frequency):
+        self.metric_fn = metric_fn
+        self.eval_frequency = eval_frequency
+        self.iteration = 0
+
+    def __call__(self):
+        def custom_eval(dtrain, predt):
+            self.iteration += 1
+            if self.eval_frequency == 0 or (self.iteration % self.eval_frequency == 0):
+                return "None", 0.0, True
+
+            return self.metric_fn(predt, dtrain)
+
+        return custom_eval
+
+
 class LGBMWrapper(ModelWrapper):
     def __init__(
         self,
@@ -64,12 +81,11 @@ class LGBMWrapper(ModelWrapper):
     def fit(
         self,
         train_data: pd.DataFrame,
-        val_data: pd.DataFrame,
-        eval_metrics: Optional[Callable] = None,
-        callbacks: Optional[List[ModelCallback]] = None,
+        val_data: Optional[pd.DataFrame] = None,
+        eval_metrics: Sequence[Callable] = [],
+        eval_frequency: int = 0,
+        callbacks: List[ModelCallback] = [],
     ) -> None:
-        if callbacks is None:
-            callbacks = []
 
         train_set = lgb.Dataset(
             train_data[self.features],
@@ -90,10 +106,14 @@ class LGBMWrapper(ModelWrapper):
             train_set,
             valid_sets=valid_sets,
             valid_names=["valid"],
-            feval=eval_metrics,
+            feval=(
+                LgbmMetric(eval_metrics[0], eval_frequency)()
+                if len(eval_metrics) > 0
+                else None
+            ),
             init_model=self.model,
             callbacks=[LGBMCallbackWrapper(cb, self) for cb in callbacks]
-            + [lgb.log_evaluation(100)],
+            + [lgb.log_evaluation(eval_frequency)],
         )
 
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:

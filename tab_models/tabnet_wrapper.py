@@ -1,15 +1,10 @@
 import json
 import zipfile
 
-import pickle
-import base64
 import os
 
 import numpy as np
 import pandas as pd
-
-from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer
 
 import torch
 import torch.optim as optim
@@ -19,7 +14,7 @@ from pytorch_tabnet.metrics import Metric
 
 
 from tab_models.utils import log_timing, write_json
-from tab_models.model_wrapper import ModelWrapper
+from tab_models.model_wrapper import ModelCallback, ModelWrapper
 from tab_models.nn_utils import get_loss, ScalerImputer
 
 from typing import Any, Callable, Sequence, Optional, Tuple, Dict, List, Union
@@ -111,17 +106,17 @@ class TabNetWrapper(ModelWrapper):
             self.scaler_imputer.fit(X[::10])
             self.preprocess_fit = True
 
-        X = self.scaler_imputer.transform(X)
+        X = self.scaler_imputer.transform(X, dtype=np.float16)
         return X, y
 
     def fit(
         self,
         train_data: pd.DataFrame,
         val_data: Optional[pd.DataFrame] = None,
-        eval_metrics: Optional[Sequence[Callable]] = None,
+        eval_metrics: Sequence[Callable] = [],
+        eval_frequency: int = 0,
+        callbacks: List[ModelCallback] = [],
     ) -> None:
-        if eval_metrics is None:
-            eval_metrics = []
         X_train, y_train = self._prepare_data(
             train_data, fit_preprocess=not self.preprocess_fit
         )

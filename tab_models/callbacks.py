@@ -20,6 +20,7 @@ class CheckpointCallback(ModelCallback):
                 self.path_to_checkpoints, f"{self.base_name}_{iter_num}.bin"
             )
             logging.debug(f"Iteration {iter_num}, saving model to {fpath}")
+            print(f"Iteration {iter_num}, saving model to {fpath}")
             model.save(fpath)
 
 

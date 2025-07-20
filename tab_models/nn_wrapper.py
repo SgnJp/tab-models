@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Sequence
 import tqdm
 import pickle
 import base64
@@ -16,7 +16,7 @@ from tab_models.model_wrapper import ModelCallback, ModelWrapper
 from tab_models.nn_utils import ScalerImputer, get_loss
 
 import pandas as pd
-
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -242,10 +242,10 @@ class NNWrapper(ModelWrapper):
         del data
 
         if fit_scaler:
-            self.scaler_imputer.fit(X)
+            self.scaler_imputer.fit(X[::10])
             self.scaler_fit = True
 
-        X = self.scaler_imputer.transform(X, dtype=np.float32)
+        X = self.scaler_imputer.transform(X, dtype=np.float16)
         ds = TabularDataset(X, y)
         return ds
 
@@ -253,8 +253,9 @@ class NNWrapper(ModelWrapper):
         self,
         train_data: pd.DataFrame,
         val_data: Optional[pd.DataFrame] = None,
-        eval_metrics: Optional[Callable] = None,
-        callbacks: Optional[List[ModelCallback]] = None,
+        eval_metrics: Sequence[Callable] = None,
+        eval_frequency: int = 0,
+        callbacks: List[ModelCallback] = [],
     ) -> None:
 
         train_ds = self._prepare_data(train_data, fit_scaler=not self.scaler_fit)
@@ -292,11 +293,6 @@ class NNWrapper(ModelWrapper):
         )
 
         loss_fn = get_loss(self.params.get("loss_fn", "mse"))
-        val_per_era_corr = None
-        val_sharpe = None
-        best_sharpe = 0.0
-
-        steps_without_improvement = 0
         main_target_loss_factor = 1.0
 
         for epoch in range(self.params["num_epochs"]):
@@ -394,7 +390,13 @@ class NNWrapper(ModelWrapper):
         }
 
     def save(self, fpath):
-        torch.save(self.dump(), fpath)
+        if os.path.isdir(fpath):
+            filename = f"{self.model_name}.bin"
+            save_path = os.path.join(fpath, filename)
+        else:
+            save_path = fpath
+
+        torch.save(self.dump(), save_path)
 
     def feature_names(self):
         return self.features

@@ -20,8 +20,9 @@ class ModelWrapper(ABC):
         self,
         train_data: pd.DataFrame,
         val_data: Optional[pd.DataFrame] = None,
-        eval_metrics: Optional[Callable] = None,
-        callbacks: Optional[List[ModelCallback]] = None,
+        eval_metrics: Sequence[Callable] = [],
+        eval_frequency: int = 0,
+        callbacks: List[ModelCallback] = [],
     ) -> None:
         pass
 

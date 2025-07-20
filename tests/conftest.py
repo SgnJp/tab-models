@@ -31,7 +31,7 @@ def xgboost_params():
     """XGBoost parameters for testing"""
     return {
         "objective": "reg:squarederror",
-        "n_estimators": 5,  # Very small for quick tests
+        "n_estimators": 10,  # Very small for quick tests
         "learning_rate": 0.1,
         "max_depth": 2,
         "subsample": 0.8,

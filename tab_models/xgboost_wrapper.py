@@ -1,44 +1,41 @@
 from xgboost import XGBRegressor
 from xgboost.callback import TrainingCallback
-from tab_models.model_wrapper import ModelWrapper
-from tab_models.utils import log_timing
-import os
-import time
-from typing import Callable, Optional, Sequence
+from tab_models.model_wrapper import ModelWrapper, ModelCallback
+from typing import Callable, Optional, Sequence, Any, List
 import pandas as pd
 import numpy as np
 
 
-class CheckpointCallback(TrainingCallback):
-    def __init__(self, save_period, save_path_prefix):
-        self.save_period = save_period
-        self.save_path_prefix = save_path_prefix
+class XGBoostCallbackWrapper(TrainingCallback):
+    def __init__(self, model_callback: Any, model_wrapper: "XGBoostWrapper") -> None:
+        self.model_callback = model_callback
+        self.model_wrapper = model_wrapper
 
     def after_iteration(self, model, epoch, evals_log):
-        if (epoch + 1) % self.save_period == 0:
-            filename = f"{self.save_path_prefix}_iter{epoch + 1}.json"
-            model.save_model(os.path.join("checkpoints", filename))
-            print(f"[Checkpoint] Saved model at iteration {epoch + 1} to {filename}")
+        self.model_wrapper.model = model
+        self.model_callback.after_iteration(epoch, self.model_wrapper)
         return False
 
 
-class TimeCallback(TrainingCallback):
-    def __init__(self):
-        self.times = []
+class XgbMetric:
+    def __init__(self, metric_fn, eval_frequency):
+        self.metric_fn = metric_fn
+        self.eval_frequency = eval_frequency
+        self.iteration = 0
 
-    def before_training(self, model):
-        self.start_time = time.time()
-        return model
+    def __call__(self):
+        def custom_eval(dtrain, predt):
+            self.iteration += 1
+            if (
+                self.eval_frequency == 0
+                or (self.iteration - 1) % self.eval_frequency == 0
+            ):
+                return 0.0
 
-    def after_iteration(self, model, epoch, evals_log):
-        now = time.time()
-        if (epoch + 1) % 50 == 0:
-            elapsed = now - self.start_time
-            self.times.append(elapsed)
-            self.start_time = now
-            print(f"Iteration {epoch}, elapsed: {elapsed:.4f} sec")
+            name, score, _ = self.metric_fn(predt, dtrain)
+            return score
 
-        return False
+        return custom_eval
 
 
 class XGBoostWrapper(ModelWrapper):
@@ -62,12 +59,10 @@ class XGBoostWrapper(ModelWrapper):
         self,
         train_data: pd.DataFrame,
         val_data: Optional[pd.DataFrame] = None,
-        eval_metrics: Optional[Callable] = None,
-        callbacks: Optional[list] = None,
+        eval_metrics: Sequence[Callable] = [],
+        eval_frequency: int = 100,
+        callbacks: List[ModelCallback] = [],
     ) -> None:
-        def custom_eval(dtrain, predt):
-            name, score, _ = eval_metrics(predt, dtrain)
-            return score
 
         self.model = XGBRegressor(
             objective=self.params["objective"],
@@ -79,13 +74,19 @@ class XGBoostWrapper(ModelWrapper):
             seed=self.params.get("seed", 0),
             subsample=self.params["subsample"],
             min_child_weight=self.params["min_child_weight"],
-            eval_metric=custom_eval if eval_metrics is not None else None,
-            #            tree_method="hist",
-            #            multi_strategy="multi_output_tree",
-            callbacks=[TimeCallback()],
+            eval_metric=(
+                XgbMetric(eval_metrics[0], eval_frequency)()
+                if len(eval_metrics) > 0
+                else None
+            ),
+            callbacks=[
+                XGBoostCallbackWrapper(callback, self) for callback in callbacks
+            ],
         )
 
-        all_target_names = [self.params["target_name"]] + self.params.get("auxiliary_targets", [])
+        all_target_names = [self.params["target_name"]] + self.params.get(
+            "auxiliary_targets", []
+        )
         self.model.fit(
             train_data[self.features],
             train_data[all_target_names],
@@ -94,14 +95,11 @@ class XGBoostWrapper(ModelWrapper):
                 if val_data is not None
                 else None
             ),
-            verbose=100,
+            verbose=eval_frequency,
         )
 
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:
-        import numpy as np
-
-        result = self.model.predict(test_data[self.features])
-        return np.asarray(result)
+        return np.asarray(self.model.predict(test_data[self.features]))
 
     def save(self, fpath: str) -> None:
         import pickle
@@ -122,8 +120,6 @@ class XGBoostWrapper(ModelWrapper):
         }
         with open(save_path, "wb") as f:
             pickle.dump(extra_info, f)
-
-        # No return, as per abstract method
 
     def feature_names(self) -> Sequence[str]:
         return self.features

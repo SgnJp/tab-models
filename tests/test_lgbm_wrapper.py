@@ -7,7 +7,7 @@ import sys
 # Add the tab-models directory to the path so we can import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tab_models"))
 
-from lgbm_wrapper import LGBMWrapper
+from tab_models.lgbm_wrapper import LGBMWrapper
 from tab_models.callbacks import CheckpointCallback
 from tab_models.model_utils import load_model
 
@@ -68,7 +68,7 @@ class TestLGBMWrapper:
         model = LGBMWrapper(self.params, self.features, fpath=None)
         train_data = self.data.iloc[:80]
         val_data = self.data.iloc[80:]
-        model.fit(train_data, val_data, eval_metrics=None, callbacks=[])
+        model.fit(train_data, val_data, eval_metrics=[], callbacks=[])
         assert hasattr(model.model, "feature_importance")
 
     def test_predict(self):
@@ -76,7 +76,7 @@ class TestLGBMWrapper:
         model = LGBMWrapper(self.params, self.features, fpath=None)
         train_data = self.data.iloc[:80]
         val_data = self.data.iloc[80:]
-        model.fit(train_data, val_data, eval_metrics=None, callbacks=[])
+        model.fit(train_data, val_data, eval_metrics=[], callbacks=[])
         predictions = model.predict(self.data)
         assert len(predictions) == len(self.data)
         assert isinstance(predictions, np.ndarray)
@@ -96,17 +96,40 @@ class TestLGBMWrapper:
             callback = CheckpointCallback(
                 path_to_checkpoints=tmpdir, n_iterations=5, base_name="test_model"
             )
-            model.fit(train_data, val_data, eval_metrics=None, callbacks=[callback])
+            model.fit(train_data, val_data, eval_metrics=[], callbacks=[callback])
             files = os.listdir(tmpdir)
             assert any("test_model_4.bin" in f for f in files)
             assert any("test_model_9.bin" in f for f in files)
+
+    def test_fit_with_mock_metric_and_eval_frequency(self):
+        """Test that a mock metric is called with eval_frequency during fit"""
+        from unittest.mock import MagicMock
+
+        model = LGBMWrapper(self.params, self.features, fpath=None)
+        train_data = self.data.iloc[:80]
+        val_data = self.data.iloc[80:]
+
+        # Create a mock metric
+        mock_metric = MagicMock(return_value=("Mock", 0.0, False))
+
+        # Fit the model with the mock metric and eval_frequency
+        model.fit(
+            train_data,
+            val_data,
+            eval_metrics=[mock_metric],
+            callbacks=[],
+            eval_frequency=2,
+        )
+
+        # Check that the mock metric was called at least once
+        assert mock_metric.call_count > 0
 
     def test_save_and_load_model(self):
         """Test saving and loading LGBM model produces identical predictions"""
         model = LGBMWrapper(self.params, self.features, fpath=None)
         train_data = self.data.iloc[:80]
         val_data = self.data.iloc[80:]
-        model.fit(train_data, val_data, eval_metrics=None, callbacks=[])
+        model.fit(train_data, val_data, eval_metrics=[], callbacks=[])
         test_data = self.data
         preds_before = model.predict(test_data)
         with tempfile.TemporaryDirectory() as tmpdir:
