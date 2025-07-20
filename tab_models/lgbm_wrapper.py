@@ -41,9 +41,10 @@ class LgbmMetric:
         self.iteration = 0
 
     def __call__(self):
-        def custom_eval(dtrain, predt):
+        def custom_eval(predt, dtrain):
             self.iteration += 1
-            if self.eval_frequency == 0 or (self.iteration % self.eval_frequency == 0):
+
+            if self.eval_frequency == 0 or (self.iteration % self.eval_frequency != 0):
                 return "None", 0.0, True
 
             return self.metric_fn(predt, dtrain)

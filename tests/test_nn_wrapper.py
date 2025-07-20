@@ -7,7 +7,7 @@ import sys
 # Add the tab-models directory to the path so we can import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tab_models"))
 
-from nn_wrapper import NNWrapper
+from tab_models.nn_wrapper import NNWrapper
 from tab_models.model_utils import load_model
 
 # Avoid multiprocessing in tests

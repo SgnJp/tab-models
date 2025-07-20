@@ -28,7 +28,7 @@ class XgbMetric:
             self.iteration += 1
             if (
                 self.eval_frequency == 0
-                or (self.iteration - 1) % self.eval_frequency == 0
+                or (self.iteration - 1) % self.eval_frequency != 0
             ):
                 return 0.0
 
