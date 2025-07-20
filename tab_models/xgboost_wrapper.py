@@ -92,7 +92,7 @@ class XGBoostWrapper(ModelWrapper):
             train_data[all_target_names],
             eval_set=(
                 [(val_data[self.features], val_data[all_target_names])]
-                if val_data is not None
+                if val_data is not None and len(val_data) > 0
                 else None
             ),
             verbose=eval_frequency,
