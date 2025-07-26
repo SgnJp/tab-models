@@ -99,7 +99,15 @@ class XGBoostWrapper(ModelWrapper):
         )
 
     def predict(self, test_data: pd.DataFrame) -> np.ndarray:
-        return np.asarray(self.model.predict(test_data[self.features]))
+        import xgboost as xgb
+
+        if isinstance(self.model, xgb.Booster):
+            ddata = xgb.DMatrix(test_data[self.features])
+            preds = self.model.predict(ddata)
+        else:
+            preds = self.model.predict(test_data[features])
+
+        return np.asarray(preds)
 
     def save(self, fpath: str) -> None:
         import pickle
