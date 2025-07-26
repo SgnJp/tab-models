@@ -293,7 +293,7 @@ class NNWrapper(ModelWrapper):
         )
 
         loss_fn = get_loss(self.params.get("loss_fn", "mse"))
-        main_target_loss_factor = 1.0
+        main_target_loss_factor = self.params["main_target_loss_factor"]
 
         for epoch in range(self.params["num_epochs"]):
             self.model.train()

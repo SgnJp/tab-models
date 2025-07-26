@@ -87,20 +87,20 @@ class LGBMWrapper(ModelWrapper):
         eval_frequency: int = 0,
         callbacks: List[ModelCallback] = [],
     ) -> None:
-
         train_set = lgb.Dataset(
             train_data[self.features],
             train_data[self.params["target_name"]],
             free_raw_data=True,
         )
         valid_sets = (
-            [lgb.Dataset(val_data[self.features], val_data[self.params["target_name"]])]
+            [lgb.Dataset(val_data[self.features], val_data[self.params["target_name"]], reference=train_set)]
             if len(val_data) > 0
             else []
         )
 
         del train_data
         gc.collect()
+
 
         self.model = lgb.train(
             self.params,
